@@ -1,29 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 type AsyncFunc = (...args: any[]) => Promise<any>;
+type WithLoading<T> = T & { isLoading: boolean };
 
-export const useWithLoading = <
-  F extends AsyncFunc,
-  Args extends Parameters<F>,
-  Return extends ReturnType<F>
->(
-  f: F
-) => {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const wrapFunc = useMemo(() => {
-    const wrap = async (...args: Args): Promise<Awaited<Return>> => {
-      setIsLoading(true);
+function withLoading<F extends AsyncFunc>(f: F) {
+  const wrap = Object.assign(
+    async (...args: Parameters<F>): Promise<ReturnType<F>> => {
       try {
+        wrap.isLoading = true;
         return await f(...args);
       } finally {
-        setIsLoading(false);
+        wrap.isLoading = false;
       }
-    };
-    wrap.isLoading = isLoading;
+    },
+    { isLoading: false }
+  );
 
-    return wrap;
-  }, [f, isLoading]);
+  return wrap as WithLoading<F>;
+}
 
-  return wrapFunc;
+export const useWithLoading = <F extends AsyncFunc>(f: F) => {
+  const wrapFunc = useRef<WithLoading<F>>(withLoading(f));
+
+  useEffect(() => {
+    wrapFunc.current = withLoading(f);
+  }, [f]);
+
+  return wrapFunc.current;
 };
